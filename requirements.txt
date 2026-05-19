@@ -1,0 +1,6 @@
+libarchive-c==5.3
+pefile==2024.8.26
+PyQt6==6.11.0
+PyQt6-Qt6==6.11.1
+PyQt6_sip==13.11.1
+PyYAML==6.0.3
