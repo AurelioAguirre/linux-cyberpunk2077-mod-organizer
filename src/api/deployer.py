@@ -58,6 +58,31 @@ def _detect_cp2077_root(contents: list[str]) -> str | None:
     return None
 
 
+def remove_mods(game_path: Path, baseline_files: set[str]) -> tuple[int, int]:
+    """Delete every file in game_path that is not in baseline_files.
+
+    Returns (files_deleted, dirs_deleted).
+    """
+    files_deleted = 0
+    for file in game_path.rglob("*"):
+        if not file.is_file():
+            continue
+        rel = str(file.relative_to(game_path)).replace("\\", "/")
+        if rel not in baseline_files:
+            log.debug("Removing %s", rel)
+            file.unlink()
+            files_deleted += 1
+
+    # Remove directories that are now empty, deepest first
+    dirs_deleted = 0
+    for folder in sorted(game_path.rglob("*"), reverse=True):
+        if folder.is_dir() and not any(folder.iterdir()):
+            folder.rmdir()
+            dirs_deleted += 1
+
+    return files_deleted, dirs_deleted
+
+
 def undeploy(game_path: Path) -> None:
     """Remove all deployed mods from the game directory."""
     target_dir = game_path / ARCHIVE_TARGET

@@ -37,6 +37,20 @@ def save_snapshot(snapshot: GameSnapshot, resources_path: Path) -> Path:
     return out_path
 
 
+def load_snapshot(resources_path: Path, game_version: str) -> GameSnapshot | None:
+    """Load baseline snapshot matching game_version, or any available baseline."""
+    versioned = resources_path / f"baseline_{game_version}.json"
+    candidates = [versioned] if versioned.exists() else sorted(resources_path.glob("baseline_*.json"))
+    if not candidates:
+        return None
+    data = json.loads(candidates[0].read_text())
+    return GameSnapshot(
+        game_version=data["game_version"],
+        timestamp=data["timestamp"],
+        files=data["files"],
+    )
+
+
 def list_archive_contents(archive_path: Path) -> list[str]:
     contents = []
     with libarchive.file_reader(str(archive_path)) as archive:

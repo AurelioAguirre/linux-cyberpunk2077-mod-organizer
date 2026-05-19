@@ -8,8 +8,8 @@ from PyQt6.QtGui import QColor, QTextCharFormat, QTextCursor, QPixmap
 from PyQt6.QtCore import pyqtSignal, QObject, Qt
 from config import Config, RESOURCES_PATH
 from utils import is_valid_game_path, get_game_version
-from api.scanner import build_snapshot, save_snapshot, scan_mod_archives, list_archive_contents
-from api.deployer import install_mod
+from api.scanner import build_snapshot, save_snapshot, scan_mod_archives, list_archive_contents, load_snapshot
+from api.deployer import install_mod, remove_mods
 
 log = logging.getLogger(__name__)
 
@@ -104,7 +104,12 @@ class MainWindow(QMainWindow):
         btn_install_all.clicked.connect(self._install_all_mods)
         button_layout.addWidget(btn_install_all, alignment=Qt.AlignmentFlag.AlignHCenter)
 
-        for i in range(4, 6):
+        btn_remove = QPushButton("Remove all mods")
+        btn_remove.setFixedSize(440, 50)
+        btn_remove.clicked.connect(self._remove_all_mods)
+        button_layout.addWidget(btn_remove, alignment=Qt.AlignmentFlag.AlignHCenter)
+
+        for i in range(5, 6):
             btn = QPushButton(f"Option {i}")
             btn.setFixedSize(440, 50)
             button_layout.addWidget(btn, alignment=Qt.AlignmentFlag.AlignHCenter)
@@ -168,6 +173,39 @@ class MainWindow(QMainWindow):
             log.info("Done — %d files installed from %s", count, archive_path.name)
         except Exception as e:
             log.error("Installation failed: %s", e)
+
+    def _remove_all_mods(self):
+        version = get_game_version(self.config.game_path)
+        snapshot = load_snapshot(RESOURCES_PATH, version)
+
+        if snapshot is None:
+            log.error("No baseline snapshot found — cannot remove mods safely")
+            return
+
+        box = QMessageBox(self)
+        box.setWindowTitle("Remove all mods")
+        box.setIcon(QMessageBox.Icon.Warning)
+        box.setText("<b>This will delete every file not present in the clean baseline.</b>")
+        box.setInformativeText(
+            "This removes files added by mods, but will NOT restore game files that "
+            "were overwritten or edited by a mod.\n\n"
+            "To restore those, go to Steam → Library → right-click Cyberpunk 2077 → "
+            "Properties → Installed Files → Verify integrity of game files.\n\n"
+            "Do you want to continue?"
+        )
+        box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel)
+        box.setDefaultButton(QMessageBox.StandardButton.Cancel)
+
+        if box.exec() != QMessageBox.StandardButton.Yes:
+            return
+
+        log.info("Removing mods — comparing against baseline v%s...", snapshot.game_version)
+        baseline = set(snapshot.files)
+        try:
+            files_deleted, dirs_deleted = remove_mods(self.config.game_path, baseline)
+            log.info("Done — %d file(s) and %d empty folder(s) removed", files_deleted, dirs_deleted)
+        except Exception as e:
+            log.error("Failed during removal: %s", e)
 
     def _install_all_mods(self):
         if not self.config.mods_path.is_dir():
