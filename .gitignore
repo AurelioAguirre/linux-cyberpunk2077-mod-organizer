@@ -4,6 +4,3 @@ venv/
 __pycache__/
 .claude
 .pyc
-
-# Dev branch rule
-.sabotage
